@@ -46,16 +46,16 @@ G.FUNCS.talismanMenu = function(e)
               chosen = true,
               tab_definition_function = function()
                 tal_nodes = {{n=G.UIT.R, config={align = "cm"}, nodes={
-                  {n=G.UIT.O, config={object = DynaText({string = "Select features to enable:", colours = {G.C.WHITE}, shadow = true, scale = 0.4})}},
-                }},create_toggle({label = "Disable Scoring Animations", ref_table = Talisman.config_file, ref_value = "disable_anims",
+                  {n=G.UIT.O, config={object = DynaText({string = "选择要启用的特性：", colours = {G.C.WHITE}, shadow = true, scale = 0.4})}},
+                }},create_toggle({label = "禁用计分动画", ref_table = Talisman.config_file, ref_value = "disable_anims",
                 callback = function(_set_toggle)
 	                nativefs.write(lovely.mod_dir .. "/Talisman/config.lua", STR_PACK(Talisman.config_file))
                 end}),
                 create_option_cycle({
-                  label = "Score Limit (requires game restart)",
+                  label = "分数限制（改动后需重启）",
                   scale = 0.8,
                   w = 6,
-                  options = {"Vanilla (e308)", "BigNum (ee308)", "OmegaNum (e10##1000)"},
+                  options = {"原版 (e308)", "BigNum (ee308)", "OmegaNum (e10##1000)"},
                   opt_callback = 'talisman_upd_score_opt',
                   current_option = Talisman.config_file.score_opt_id,
                 })}
