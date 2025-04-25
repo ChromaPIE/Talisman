@@ -1,61 +1,76 @@
 local lovely = require("lovely")
 local nativefs = require("nativefs")
 
+if not nativefs.getInfo(lovely.mod_dir .. "/Talisman") then
+    error(
+        'Could not find proper Talisman folder.\nPlease make sure the folder for Talisman is named exactly "Talisman" and not "Talisman-main" or anything else.')
+end
 
-Talisman = {config_file = {disable_anims = true, break_infinity = "bignumber", score_opt_id = 2}}
+-- "Borrowed" from Trance
+function load_file_with_fallback2(a, aa)
+    local success, result = pcall(function() return assert(load(nativefs.read(a)))() end)
+    if success then
+        return result
+    end
+    local fallback_success, fallback_result = pcall(function() return assert(load(nativefs.read(aa)))() end)
+    if fallback_success then
+        return fallback_result
+    end
+end
+
+local talismanloc = init_localization
+function init_localization()
+	local abc = load_file_with_fallback2(
+		lovely.mod_dir .. "/Talisman/localization/" .. (G.SETTINGS.language or "en-us") .. ".lua",
+		lovely.mod_dir .. "/Talisman/localization/en-us.lua"
+	)
+	for k, v in pairs(abc) do
+		if k ~= "descriptions" then
+			G.localization.misc.dictionary[k] = v
+		end
+		-- todo error messages(?)
+		G.localization.misc.dictionary[k] = v
+	end
+	talismanloc()
+end
+
+Talisman = {config_file = {disable_anims = true, break_infinity = "omeganum", score_opt_id = 2}}
 if nativefs.read(lovely.mod_dir.."/Talisman/config.lua") then
     Talisman.config_file = STR_UNPACK(nativefs.read(lovely.mod_dir.."/Talisman/config.lua"))
 
     if Talisman.config_file.break_infinity and type(Talisman.config_file.break_infinity) ~= 'string' then
-      Talisman.config_file.break_infinity = "bignumber"
+      Talisman.config_file.break_infinity = "omeganum"
     end
 end
-
-if not SpectralPack then
-  SpectralPack = {}
-  local ct = create_tabs
-  function create_tabs(args)
-      if args and args.tab_h == 7.05 then
-          args.tabs[#args.tabs+1] = {
-              label = "Spectral Pack",
-              tab_definition_function = function() return {
-                  n = G.UIT.ROOT,
-                  config = {
-                      emboss = 0.05,
-                      minh = 6,
-                      r = 0.1,
-                      minw = 10,
-                      align = "cm",
-                      padding = 0.2,
-                      colour = G.C.BLACK
-                  },
-                  nodes = SpectralPack
-              } end
-          }
-      end
-      return ct(args)
+if not SMODS or not JSON then
+  local createOptionsRef = create_UIBox_options
+  function create_UIBox_options()
+  contents = createOptionsRef()
+  local m = UIBox_button({
+  minw = 5,
+  button = "talismanMenu",
+  label = {
+  	localize({ type = "name_text", set = "Spectral", key = "c_talisman" })
+  },
+  colour = G.C.GOLD
+  })
+  table.insert(contents.nodes[1].nodes[1].nodes[1].nodes, #contents.nodes[1].nodes[1].nodes[1].nodes + 1, m)
+  return contents
   end
 end
-SpectralPack[#SpectralPack+1] = UIBox_button{ label = {"Talisman"}, button = "talismanMenu", colour = G.C.MONEY, minw = 5, minh = 0.7, scale = 0.6}
-G.FUNCS.talismanMenu = function(e)
-  local tabs = create_tabs({
-      snap_to_nav = true,
-      tabs = {
-          {
-              label = "Talisman",
-              chosen = true,
-              tab_definition_function = function()
+
+Talisman.config_tab = function()
                 tal_nodes = {{n=G.UIT.R, config={align = "cm"}, nodes={
-                  {n=G.UIT.O, config={object = DynaText({string = "选择要启用的特性：", colours = {G.C.WHITE}, shadow = true, scale = 0.4})}},
-                }},create_toggle({label = "禁用计分动画", ref_table = Talisman.config_file, ref_value = "disable_anims",
+                  {n=G.UIT.O, config={object = DynaText({string = localize("talisman_string_A"), colours = {G.C.WHITE}, shadow = true, scale = 0.4})}},
+                }},create_toggle({label = localize("talisman_string_B"), ref_table = Talisman.config_file, ref_value = "disable_anims",
                 callback = function(_set_toggle)
 	                nativefs.write(lovely.mod_dir .. "/Talisman/config.lua", STR_PACK(Talisman.config_file))
                 end}),
                 create_option_cycle({
-                  label = "分数限制（改动后需重启）",
+                  label = localize("talisman_string_C"),
                   scale = 0.8,
                   w = 6,
-                  options = {"原版 (e308)", "BigNum (ee308)", "OmegaNum (e10##1000)"},
+                  options = {localize("talisman_vanilla"), localize("talisman_bignum"), localize("talisman_omeganum") .. "(e10##1000)"},
                   opt_callback = 'talisman_upd_score_opt',
                   current_option = Talisman.config_file.score_opt_id,
                 })}
@@ -73,6 +88,14 @@ G.FUNCS.talismanMenu = function(e)
                 nodes = tal_nodes
             }
               end
+G.FUNCS.talismanMenu = function(e)
+  local tabs = create_tabs({
+      snap_to_nav = true,
+      tabs = {
+          {
+              label = localize({ type = "name_text", set = "Spectral", key = "c_talisman" }),
+              chosen = true,
+              tab_definition_function = Talisman.config_tab
           },
       }})
   G.FUNCS.overlay_menu{
@@ -98,7 +121,13 @@ if Talisman.config_file.break_infinity then
       for _, v in pairs(obj.hands) do
           v.chips = to_big(v.chips)
           v.mult = to_big(v.mult)
+          v.s_chips = to_big(v.s_chips)
+          v.s_mult = to_big(v.s_mult)
+          v.l_chips = to_big(v.l_chips)
+          v.l_mult = to_big(v.l_mult)
+          v.level = to_big(v.level)
       end
+      obj.starting_params.dollars = to_big(obj.starting_params.dollars)
       return obj
   end
 
@@ -120,53 +149,107 @@ if Talisman.config_file.break_infinity then
       if type(x) == 'table' then return x:floor() end
       return mf(x)
   end
+  local mc = math.ceil
+  function math.ceil(x)
+      if type(x) == 'table' then return x:ceil() end
+      return mc(x)
+  end
+
+function lenient_bignum(x)
+    if type(x) == "number" then return x end
+    if to_big(x) < to_big(1e300) and to_big(x) > to_big(-1e300) then
+      return x:to_number()
+    end
+    return x
+  end
+
+  --prevent some log-related crashes
+  local sns = score_number_scale
+  function score_number_scale(scale, amt)
+    local ret = sns(scale, amt)
+    if type(ret) == "table" then
+      if ret > to_big(1e300) then return 1e300 end
+      return ret:to_number()
+    end
+    return ret
+  end
+
+  local gftsj = G.FUNCS.text_super_juice
+  function G.FUNCS.text_super_juice(e, _amount)
+    if type(_amount) == "table" then
+      if _amount > to_big(1e300) then
+        _amount = 1e300
+      else
+        _amount = _amount:to_number()
+      end
+    end
+    return gftsj(e, _amount)
+  end
 
   local l10 = math.log10
   function math.log10(x)
-      if type(x) == 'table' then return l10(math.min(x:to_number(),1e300)) end--x:log10() end
-      return l10(x)
+      if type(x) == 'table' then 
+        if x.log10 then return lenient_bignum(x:log10()) end
+        return lenient_bignum(l10(math.min(x:to_number(),1e300)))
+      end
+      return lenient_bignum(l10(x))
   end
 
   local lg = math.log
   function math.log(x, y)
       if not y then y = 2.718281828459045 end
-      if type(x) == 'table' then return lg(math.min(x:to_number(),1e300),y) end --x:log(y) end
-      return lg(x,y)
+      if type(x) == 'table' then 
+        if x.log then return lenient_bignum(x:log(to_big(y))) end
+        if x.logBase then return lenient_bignum(x:logBase(to_big(y))) end
+        return lenient_bignum(lg(math.min(x:to_number(),1e300),y))
+      end
+      return lenient_bignum(lg(x,y))
   end
 
-
-  function SMODS.get_blind_amount(ante)
-    local k = to_big(0.75)
-    local scale = G.GAME.modifiers.scaling
-    local amounts = {
-        to_big(300),
-        to_big(700 + 100*scale),
-        to_big(1400 + 600*scale),
-        to_big(2100 + 2900*scale),
-        to_big(15000 + 5000*scale*math.log(scale)),
-        to_big(12000 + 8000*(scale+1)*(0.4*scale)),
-        to_big(10000 + 25000*(scale+1)*((scale/4)^2)),
-        to_big(50000 * (scale+1)^2 * (scale/7)^2)
-    }
+  function math.exp(x)
+    local big_e = to_big(2.718281828459045)
     
-    if ante < 1 then return to_big(100) end
-    if ante <= 8 then 
-      local amount = amounts[ante]
+    if type(big_e) == "number" then
+      return lenient_bignum(big_e ^ x)
+    else
+      return lenient_bignum(big_e:pow(x))
+    end
+  end 
+
+  if SMODS then
+    function SMODS.get_blind_amount(ante)
+      local k = to_big(0.75)
+      local scale = G.GAME.modifiers.scaling
+      local amounts = {
+          to_big(300),
+          to_big(700 + 100*scale),
+          to_big(1400 + 600*scale),
+          to_big(2100 + 2900*scale),
+          to_big(15000 + 5000*scale*math.log(scale)),
+          to_big(12000 + 8000*(scale+1)*(0.4*scale)),
+          to_big(10000 + 25000*(scale+1)*((scale/4)^2)),
+          to_big(50000 * (scale+1)^2 * (scale/7)^2)
+      }
+      
+      if ante < 1 then return to_big(100) end
+      if ante <= 8 then 
+        local amount = amounts[ante]
+        if (amount:lt(R.E_MAX_SAFE_INTEGER)) then
+          local exponent = to_big(10)^(math.floor(amount:log10() - to_big(1))):to_number()
+          amount = math.floor(amount / exponent):to_number() * exponent
+        end
+        amount:normalize()
+        return amount
+       end
+      local a, b, c, d = amounts[8], amounts[8]/amounts[7], ante-8, 1 + 0.2*(ante-8)
+      local amount = math.floor(a*(b + (b*k*c)^d)^c)
       if (amount:lt(R.E_MAX_SAFE_INTEGER)) then
         local exponent = to_big(10)^(math.floor(amount:log10() - to_big(1))):to_number()
         amount = math.floor(amount / exponent):to_number() * exponent
       end
       amount:normalize()
       return amount
-     end
-    local a, b, c, d = amounts[8], amounts[8]/amounts[7], ante-8, 1 + 0.2*(ante-8)
-    local amount = math.floor(a*(b + (b*k*c)^d)^c)
-    if (amount:lt(R.E_MAX_SAFE_INTEGER)) then
-      local exponent = to_big(10)^(math.floor(amount:log10() - to_big(1))):to_number()
-      amount = math.floor(amount / exponent):to_number() * exponent
     end
-    amount:normalize()
-    return amount
   end
   -- There's too much to override here so we just fully replace this function
   -- Note that any ante scaling tweaks will need to manually changed...
@@ -234,6 +317,25 @@ if Talisman.config_file.break_infinity then
     end--]] --going to hold off on modifying this until proper save loading exists
   end
 
+  local ics = inc_career_stat
+  -- This is used often for unlocks, so we can't just prevent big money from being added
+  -- Also, I'm completely overriding this, since I don't think any mods would want to change it
+  function inc_career_stat(stat, mod)
+    if G.GAME.seeded or G.GAME.challenge then return end
+    if not G.PROFILES[G.SETTINGS.profile].career_stats[stat] then G.PROFILES[G.SETTINGS.profile].career_stats[stat] = 0 end
+    G.PROFILES[G.SETTINGS.profile].career_stats[stat] = G.PROFILES[G.SETTINGS.profile].career_stats[stat] + (mod or 0)
+    -- Make sure this isn't ever a talisman number
+    if type(G.PROFILES[G.SETTINGS.profile].career_stats[stat]) == 'table' then
+      if G.PROFILES[G.SETTINGS.profile].career_stats[stat] > to_big(1e300) then
+        G.PROFILES[G.SETTINGS.profile].career_stats[stat] = to_big(1e300)
+      elseif G.PROFILES[G.SETTINGS.profile].career_stats[stat] < to_big(-1e300) then
+        G.PROFILES[G.SETTINGS.profile].career_stats[stat] = to_big(-1e300)
+      end
+      G.PROFILES[G.SETTINGS.profile].career_stats[stat] = G.PROFILES[G.SETTINGS.profile].career_stats[stat]:to_number()
+    end
+    G:save_settings()
+  end
+
   local sn = scale_number
   function scale_number(number, scale, max, e_switch_point)
     if not Big then return sn(number, scale, max, e_switch_point) end
@@ -258,7 +360,11 @@ if Talisman.config_file.break_infinity then
 
   local tsj = G.FUNCS.text_super_juice
   function G.FUNCS.text_super_juice(e, _amount)
-    if _amount > 2 then _amount = 2 end
+    if type(_amount) == 'table' then
+      if _amount > to_big(2) then _amount = 2 end
+    else
+      if _amount > 2 then _amount = 2 end
+    end
     return tsj(e, _amount)
   end
 
@@ -320,7 +426,9 @@ function is_number(x)
 end
 
 function to_big(x, y)
-  if Big and Big.m then
+  if type(x) == 'string' and x == "0" then --hack for when 0 is asked to be a bignumber need to really figure out the fix
+    return 0
+  elseif Big and Big.m then
     return Big:new(x,y)
   elseif Big and Big.array then
     local result = Big:create(x)
@@ -328,6 +436,9 @@ function to_big(x, y)
     return result
   elseif is_number(x) then
     return x * 10^(y or 0)
+
+  elseif type(x) == "nil" then
+    return 0
   else
     if ((#x>=2) and ((x[2]>=2) or (x[2]==1) and (x[1]>308))) then
       return 1e309
@@ -336,6 +447,13 @@ function to_big(x, y)
       return math.pow(10,x[1])
     end
     return x[1]*(y or 1);
+  end
+end
+function to_number(x)
+  if type(x) == 'table' and (getmetatable(x) == BigMeta or getmetatable(x) == OmegaMeta) then
+    return x:to_number()
+  else
+    return x
   end
 end
 
@@ -347,6 +465,10 @@ end
 local jc = juice_card
 function juice_card(x)
     if not Talisman.config_file.disable_anims then jc(x) end
+end
+local cju = Card.juice_up
+function Card:juice_up(...)
+    if not Talisman.config_file.disable_anims then cju(self, ...) end
 end
 function tal_uht(config, vals)
     local col = G.C.GREEN
@@ -383,8 +505,8 @@ function tal_uht(config, vals)
             G.GAME.current_round.current_hand.hand_level = vals.level
         else
             G.GAME.current_round.current_hand.hand_level = ' '..localize('k_lvl')..tostring(vals.level)
-            if type(vals.level) == 'number' then 
-                G.hand_text_area.hand_level.config.colour = G.C.HAND_LEVELS[math.min(vals.level, 7)]
+            if is_number(vals.level) then
+                G.hand_text_area.hand_level.config.colour = G.C.HAND_LEVELS[type(vals.level) == "number" and math.floor(math.min(vals.level, 7)) or math.floor(to_big(math.min(vals.level, 7))):to_number()]
             else
                 G.hand_text_area.hand_level.config.colour = G.C.HAND_LEVELS[1]
             end
@@ -405,6 +527,25 @@ function update_hand_text(config, vals)
     else uht(config, vals)
     end
 end
+
+
+G.FUNCS.evaluate_play = function(e)
+  Talisman.scoring_state = "intro"
+  text, disp_text, poker_hands, scoring_hand, non_loc_disp_text, percent, percent_delta = evaluate_play_intro()
+  if not G.GAME.blind:debuff_hand(G.play.cards, poker_hands, text) then
+    Talisman.scoring_state = "main"
+    text, disp_text, poker_hands, scoring_hand, non_loc_disp_text, percent, percent_delta = evaluate_play_main(text, disp_text, poker_hands, scoring_hand, non_loc_disp_text, percent, percent_delta)
+  else
+    Talisman.scoring_state = "debuff"
+    text, disp_text, poker_hands, scoring_hand, non_loc_disp_text, percent, percent_delta = evaluate_play_debuff(text, disp_text, poker_hands, scoring_hand, non_loc_disp_text, percent, percent_delta)
+  end
+  Talisman.scoring_state = "final_scoring"
+  text, disp_text, poker_hands, scoring_hand, non_loc_disp_text, percent, percent_delta = evaluate_play_final_scoring(text, disp_text, poker_hands, scoring_hand, non_loc_disp_text, percent, percent_delta)
+  Talisman.scoring_state = "after"
+  evaluate_play_after(text, disp_text, poker_hands, scoring_hand, non_loc_disp_text, percent, percent_delta)
+  Talisman.scoring_state = nil
+end
+
 local upd = Game.update
 function Game:update(dt)
     upd(self, dt)
@@ -418,32 +559,163 @@ function Game:update(dt)
       Talisman.dollar_update = false
     end
 end
+Talisman.F_NO_COROUTINE = false --easy disabling for bugfixing, since the coroutine can make it hard to see where errors are
+if not Talisman.F_NO_COROUTINE then
+  --scoring coroutine
+  local oldplay = G.FUNCS.evaluate_play
 
---wrap everything in calculating contexts so we can do more things with it
-Talisman.calculating_joker = false
-Talisman.calculating_score = false
-Talisman.calculating_card = false
-Talisman.dollar_update = false
-local ccj = Card.calculate_joker
-function Card:calculate_joker(context)
-  Talisman.calculating_joker = true
-  local ret = ccj(self, context)
+  function G.FUNCS.evaluate_play(...)
+      G.SCORING_COROUTINE = coroutine.create(oldplay)
+      G.LAST_SCORING_YIELD = love.timer.getTime()
+      G.CARD_CALC_COUNTS = {} -- keys = cards, values = table containing numbers
+      local success, err = coroutine.resume(G.SCORING_COROUTINE, ...)
+      if not success then
+        error(err)
+      end
+  end
+
+  function G.FUNCS.tal_abort()
+      tal_aborted = true
+  end
+
+  local oldupd = love.update
+
+  function love.update(dt, ...)
+      oldupd(dt, ...)
+      if G.SCORING_COROUTINE then
+        if collectgarbage("count") > 1024*1024 then
+          collectgarbage("collect")
+        end
+          if coroutine.status(G.SCORING_COROUTINE) == "dead" or tal_aborted then
+              G.SCORING_COROUTINE = nil
+              G.FUNCS.exit_overlay_menu()
+              local totalCalcs = 0
+              for i, v in pairs(G.CARD_CALC_COUNTS) do
+                totalCalcs = totalCalcs + v[1]
+              end
+              G.GAME.LAST_CALCS = totalCalcs
+              G.GAME.LAST_CALC_TIME = G.CURRENT_CALC_TIME
+              G.CURRENT_CALC_TIME = 0
+              if tal_aborted and Talisman.scoring_state == "main" then
+                evaluate_play_final_scoring(text, disp_text, poker_hands, scoring_hand, non_loc_disp_text, percent, percent_delta)
+              end
+              tal_aborted = nil
+              Talisman.scoring_state = nil
+          else
+              G.SCORING_TEXT = nil
+              if not G.OVERLAY_MENU then
+                  G.scoring_text = {localize("talisman_string_D"), "", "", ""}
+                  G.SCORING_TEXT = { 
+                    {n = G.UIT.C, nodes = {
+                      {n = G.UIT.R, config = {padding = 0.1, align = "cm"}, nodes = {
+                      {n=G.UIT.O, config={object = DynaText({string = {{ref_table = G.scoring_text, ref_value = 1}}, colours = {G.C.UI.TEXT_LIGHT}, shadow = true, pop_in = 0, scale = 1, silent = true})}},
+                      }},{n = G.UIT.R,  nodes = {
+                      {n=G.UIT.O, config={object = DynaText({string = {{ref_table = G.scoring_text, ref_value = 2}}, colours = {G.C.UI.TEXT_LIGHT}, shadow = true, pop_in = 0, scale = 0.4, silent = true})}},
+                      }},{n = G.UIT.R,  nodes = {
+                      {n=G.UIT.O, config={object = DynaText({string = {{ref_table = G.scoring_text, ref_value = 3}}, colours = {G.C.UI.TEXT_LIGHT}, shadow = true, pop_in = 0, scale = 0.4, silent = true})}},
+                      }},{n = G.UIT.R,  nodes = {
+                      {n=G.UIT.O, config={object = DynaText({string = {{ref_table = G.scoring_text, ref_value = 4}}, colours = {G.C.UI.TEXT_LIGHT}, shadow = true, pop_in = 0, scale = 0.4, silent = true})}},
+                      }},{n = G.UIT.R,  nodes = {
+                      UIBox_button({
+                        colour = G.C.BLUE,
+                        button = "tal_abort",
+                        label = { localize("talisman_string_E") },
+                        minw = 4.5,
+                        focus_args = { snap_to = true },
+                      })}},
+                    }}}
+                  G.FUNCS.overlay_menu({
+                      definition = 
+                      {n=G.UIT.ROOT, minw = G.ROOM.T.w*5, minh = G.ROOM.T.h*5, config={align = "cm", padding = 9999, offset = {x = 0, y = -3}, r = 0.1, colour = {G.C.GREY[1], G.C.GREY[2], G.C.GREY[3],0.7}}, nodes= G.SCORING_TEXT}, 
+                      config = {align="cm", offset = {x=0,y=0}, major = G.ROOM_ATTACH, bond = 'Weak'}
+                  })
+              else
+
+                  if G.OVERLAY_MENU and G.scoring_text then
+                    local totalCalcs = 0
+                    for i, v in pairs(G.CARD_CALC_COUNTS) do
+                      totalCalcs = totalCalcs + v[1]
+                    end
+                    local jokersYetToScore = #G.jokers.cards + #G.play.cards - #G.CARD_CALC_COUNTS
+                    G.CURRENT_CALC_TIME = (G.CURRENT_CALC_TIME or 0) + dt
+                    G.scoring_text[1] = localize("talisman_string_D")
+                    G.scoring_text[2] = localize("talisman_string_F")..tostring(totalCalcs).." ("..tostring(number_format(G.CURRENT_CALC_TIME)).."s)"
+                    G.scoring_text[3] = localize("talisman_string_G")..tostring(jokersYetToScore)
+                    G.scoring_text[4] = localize("talisman_string_H") .. tostring(G.GAME.LAST_CALCS or localize("talisman_string_I")) .." ("..tostring(G.GAME.LAST_CALC_TIME and number_format(G.GAME.LAST_CALC_TIME) or "???").."s)"
+                  end
+
+              end
+        --this coroutine allows us to stagger GC cycles through
+        --the main source of waste in terms of memory (especially w joker retriggers) is through local variables that become garbage
+        --this practically eliminates the memory overhead of scoring
+        --event queue overhead seems to not exist if Talismans Disable Scoring Animations is off.
+        --event manager has to wait for scoring to finish until it can keep processing events anyways.
+
+              
+              G.LAST_SCORING_YIELD = love.timer.getTime()
+              
+              local success, msg = coroutine.resume(G.SCORING_COROUTINE)
+              if not success then
+                error(msg)
+              end
+          end
+      end
+  end
+
+
+
+  TIME_BETWEEN_SCORING_FRAMES = 0.03 -- 30 fps during scoring
+  -- we dont want overhead from updates making scoring much slower
+  -- originally 10 fps, I think 30 fps is a good way to balance it while making it look smooth, too
+  --wrap everything in calculating contexts so we can do more things with it
   Talisman.calculating_joker = false
-  return ret
-end
-local cuc = Card.use_consumable
-function Card:use_consumable(x,y)
-  Talisman.calculating_score = true
-  local ret = cuc(self, x,y)
   Talisman.calculating_score = false
-  return ret
-end
-local gfep = G.FUNCS.evaluate_play
-G.FUNCS.evaluate_play = function(e)
-  Talisman.calculating_score = true
-  local ret = gfep(e)
-  Talisman.calculating_score = false
-  return ret
+  Talisman.calculating_card = false
+  Talisman.dollar_update = false
+  local ccj = Card.calculate_joker
+  function Card:calculate_joker(context)
+    --scoring coroutine
+    G.CURRENT_SCORING_CARD = self
+    G.CARD_CALC_COUNTS = G.CARD_CALC_COUNTS or {}
+    if G.CARD_CALC_COUNTS[self] then
+      G.CARD_CALC_COUNTS[self][1] = G.CARD_CALC_COUNTS[self][1] + 1
+    else
+      G.CARD_CALC_COUNTS[self] = {1, 1}
+    end
+
+
+    if G.LAST_SCORING_YIELD and ((love.timer.getTime() - G.LAST_SCORING_YIELD) > TIME_BETWEEN_SCORING_FRAMES) and coroutine.running() then
+          coroutine.yield()
+    end
+    Talisman.calculating_joker = true
+    local ret, trig = ccj(self, context)
+
+    if ret and type(ret) == "table" and ret.repetitions then
+      if not ret.card then
+        G.CARD_CALC_COUNTS.other = G.CARD_CALC_COUNTS.other or {1,1}
+        G.CARD_CALC_COUNTS.other[2] = G.CARD_CALC_COUNTS.other[2] + ret.repetitions
+      else
+        G.CARD_CALC_COUNTS[ret.card] = G.CARD_CALC_COUNTS[ret.card] or {1,1}
+        G.CARD_CALC_COUNTS[ret.card][2] = G.CARD_CALC_COUNTS[ret.card][2] + ret.repetitions
+      end
+    end
+    Talisman.calculating_joker = false
+    return ret, trig
+  end
+  local cuc = Card.use_consumable
+  function Card:use_consumable(x,y)
+    Talisman.calculating_score = true
+    local ret = cuc(self, x,y)
+    Talisman.calculating_score = false
+    return ret
+  end
+  local gfep = G.FUNCS.evaluate_play
+  G.FUNCS.evaluate_play = function(e)
+    Talisman.calculating_score = true
+    local ret = gfep(e)
+    Talisman.calculating_score = false
+    return ret
+  end
 end
 --[[local ec = eval_card
 function eval_card()
@@ -467,37 +739,106 @@ function Card:set_seal(a,b,immediate)
   return ss(self,a,b,Talisman.config_file.disable_anims and (Talisman.calculating_joker or Talisman.calculating_score or Talisman.calculating_card) or immediate)
 end
 
+function Card:get_chip_x_bonus()
+    if self.debuff then return 0 end
+    if self.ability.set == 'Joker' then return 0 end
+    if (self.ability.x_chips or 0) <= 1 then return 0 end
+    return self.ability.x_chips
+end
+
+function Card:get_chip_e_bonus()
+    if self.debuff then return 0 end
+    if self.ability.set == 'Joker' then return 0 end
+    if (self.ability.e_chips or 0) <= 1 then return 0 end
+    return self.ability.e_chips
+end
+
+function Card:get_chip_ee_bonus()
+    if self.debuff then return 0 end
+    if self.ability.set == 'Joker' then return 0 end
+    if (self.ability.ee_chips or 0) <= 1 then return 0 end
+    return self.ability.ee_chips
+end
+
+function Card:get_chip_eee_bonus()
+    if self.debuff then return 0 end
+    if self.ability.set == 'Joker' then return 0 end
+    if (self.ability.eee_chips or 0) <= 1 then return 0 end
+    return self.ability.eee_chips
+end
+
+function Card:get_chip_hyper_bonus()
+    if self.debuff then return {0,0} end
+    if self.ability.set == 'Joker' then return {0,0} end
+	if type(self.ability.hyper_chips) ~= 'table' then return {0,0} end
+    if (self.ability.hyper_chips[1] <= 0 or self.ability.hyper_chips[2] <= 0) then return {0,0} end
+    return self.ability.hyper_chips
+end
+
+function Card:get_chip_e_mult()
+    if self.debuff then return 0 end
+    if self.ability.set == 'Joker' then return 0 end
+    if (self.ability.e_mult or 0) <= 1 then return 0 end
+    return self.ability.e_mult
+end
+
+function Card:get_chip_ee_mult()
+    if self.debuff then return 0 end
+    if self.ability.set == 'Joker' then return 0 end
+    if (self.ability.ee_mult or 0) <= 1 then return 0 end
+    return self.ability.ee_mult
+end
+
+function Card:get_chip_eee_mult()
+    if self.debuff then return 0 end
+    if self.ability.set == 'Joker' then return 0 end
+    if (self.ability.eee_mult or 0) <= 1 then return 0 end
+    return self.ability.eee_mult
+end
+
+function Card:get_chip_hyper_mult()
+    if self.debuff then return {0,0} end
+    if self.ability.set == 'Joker' then return {0,0} end
+	if type(self.ability.hyper_mult) ~= 'table' then return {0,0} end
+    if (self.ability.hyper_mult[1] <= 0 or self.ability.hyper_mult[2] <= 0) then return {0,0} end
+    return self.ability.hyper_mult
+end
+
 --Easing fixes
 --Changed this to always work; it's less pretty but fine for held in hand things
 local edo = ease_dollars
 function ease_dollars(mod, instant)
   if Talisman.config_file.disable_anims then--and (Talisman.calculating_joker or Talisman.calculating_score or Talisman.calculating_card) then
     mod = mod or 0
-    if mod < 0 then inc_career_stat('c_dollars_earned', mod) end
+    if to_big(mod) < to_big(0) then inc_career_stat('c_dollars_earned', mod) end
     G.GAME.dollars = G.GAME.dollars + mod
     Talisman.dollar_update = true
   else return edo(mod, instant) end
 end
 
 local su = G.start_up
-function G:start_up()
-  su(self)
-  function STR_UNPACK(str)
-    local chunk, err = loadstring(str)
-    if chunk then
-      setfenv(chunk, {Big = Big, BigMeta = BigMeta, OmegaMeta = OmegaMeta, to_big = to_big})  -- Use an empty environment to prevent access to potentially harmful functions
-      local success, result = pcall(chunk)
-      if success then
-      return result
-      else
-      print("Error unpacking string: " .. result)
-      return nil
-      end
+function safe_str_unpack(str)
+  local chunk, err = loadstring(str)
+  if chunk then
+    setfenv(chunk, {Big = Big, BigMeta = BigMeta, OmegaMeta = OmegaMeta, to_big = to_big, inf = 1.79769e308})  -- Use an empty environment to prevent access to potentially harmful functions
+    local success, result = pcall(chunk)
+    if success then
+    return result
     else
-      print("Error loading string: " .. err)
-      return nil
+    print("[Talisman] Error unpacking string: " .. result)
+    print(tostring(str))
+    return nil
     end
-    end
+  else
+    print("[Talisman] Error loading string: " .. err)
+    print(tostring(str))
+    return nil
+  end
+  end
+function G:start_up()
+  STR_UNPACK = safe_str_unpack
+  su(self)
+  STR_UNPACK = safe_str_unpack
 end
 
 --Skip round animation things
@@ -517,6 +858,214 @@ function G.FUNCS.evaluate_round()
     else
         return gfer()
     end
+end
+
+local g_start_run = Game.start_run
+function Game:start_run(args)
+  local ret = g_start_run(self, args)
+  self.GAME.round_resets.ante_disp = self.GAME.round_resets.ante_disp or number_format(self.GAME.round_resets.ante)
+  return ret
+end
+
+-- Steamodded calculation API: add extra operations
+if SMODS and SMODS.calculate_individual_effect then
+  local smods_xchips = false
+  for _, v in pairs(SMODS.calculation_keys) do
+    if v == 'x_chips' then
+      smods_xchips = true
+      break
+    end
+  end
+  local scie = SMODS.calculate_individual_effect
+  function SMODS.calculate_individual_effect(effect, scored_card, key, amount, from_edition)
+    -- For some reason, some keys' animations are completely removed
+    -- I think this is caused by a lovely patch conflict
+    --if key == 'chip_mod' then key = 'chips' end
+    --if key == 'mult_mod' then key = 'mult' end
+    --if key == 'Xmult_mod' then key = 'x_mult' end
+    local ret = scie(effect, scored_card, key, amount, from_edition)
+    if ret then
+      return ret
+    end
+    if not smods_xchips and (key == 'x_chips' or key == 'xchips' or key == 'Xchip_mod') and amount ~= 1 then 
+      if effect.card then juice_card(effect.card) end
+      hand_chips = mod_chips(hand_chips * amount)
+      update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
+      if not effect.remove_default_message then
+          if from_edition then
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "X"..amount, colour =  G.C.EDITION, edition = true})
+          elseif key ~= 'Xchip_mod' then
+              if effect.xchip_message then
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.xchip_message)
+              else
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'x_chips', amount, percent)
+              end
+          end
+      end
+      return true
+    end
+
+    if (key == 'e_chips' or key == 'echips' or key == 'Echip_mod') and amount ~= 1 then 
+      if effect.card then juice_card(effect.card) end
+      hand_chips = mod_chips(hand_chips ^ amount)
+      update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
+      if not effect.remove_default_message then
+          if from_edition then
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^"..amount, colour =  G.C.EDITION, edition = true})
+          elseif key ~= 'Echip_mod' then
+              if effect.echip_message then
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.echip_message)
+              else
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'e_chips', amount, percent)
+              end
+          end
+      end
+      return true
+    end
+
+    if (key == 'ee_chips' or key == 'eechips' or key == 'EEchip_mod') and amount ~= 1 then 
+      if effect.card then juice_card(effect.card) end
+      hand_chips = mod_chips(hand_chips:arrow(2, amount))
+      update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
+      if not effect.remove_default_message then
+          if from_edition then
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^^"..amount, colour =  G.C.EDITION, edition = true})
+          elseif key ~= 'EEchip_mod' then
+              if effect.eechip_message then
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.eechip_message)
+              else
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'ee_chips', amount, percent)
+              end
+          end
+      end
+      return true
+    end
+
+    if (key == 'eee_chips' or key == 'eeechips' or key == 'EEEchip_mod') and amount ~= 1 then 
+      if effect.card then juice_card(effect.card) end
+      hand_chips = mod_chips(hand_chips:arrow(3, amount))
+      update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
+      if not effect.remove_default_message then
+          if from_edition then
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^^^"..amount, colour =  G.C.EDITION, edition = true})
+          elseif key ~= 'EEEchip_mod' then
+              if effect.eeechip_message then
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.eeechip_message)
+              else
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'eee_chips', amount, percent)
+              end
+          end
+      end
+      return true
+    end
+
+    if (key == 'hyper_chips' or key == 'hyperchips' or key == 'hyperchip_mod') and type(amount) == 'table' then 
+      if effect.card then juice_card(effect.card) end
+      hand_chips = mod_chips(hand_chips:arrow(amount[1], amount[2]))
+      update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
+      if not effect.remove_default_message then
+          if from_edition then
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = (amount[1] > 5 and ('{' .. amount[1] .. '}') or string.rep('^', amount[1])) .. amount[2], colour =  G.C.EDITION, edition = true})
+          elseif key ~= 'hyperchip_mod' then
+              if effect.hyperchip_message then
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.hyperchip_message)
+              else
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'hyper_chips', amount, percent)
+              end
+          end
+      end
+      return true
+    end
+
+    if (key == 'e_mult' or key == 'emult' or key == 'Emult_mod') and amount ~= 1 then 
+      if effect.card then juice_card(effect.card) end
+      mult = mod_mult(mult ^ amount)
+      update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
+      if not effect.remove_default_message then
+          if from_edition then
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^"..amount.." Mult", colour =  G.C.EDITION, edition = true})
+          elseif key ~= 'Emult_mod' then
+              if effect.emult_message then
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.emult_message)
+              else
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'e_mult', amount, percent)
+              end
+          end
+      end
+      return true
+    end
+
+    if (key == 'ee_mult' or key == 'eemult' or key == 'EEmult_mod') and amount ~= 1 then 
+      if effect.card then juice_card(effect.card) end
+      mult = mod_mult(mult:arrow(2, amount))
+      update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
+      if not effect.remove_default_message then
+          if from_edition then
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^^"..amount.." Mult", colour =  G.C.EDITION, edition = true})
+          elseif key ~= 'EEmult_mod' then
+              if effect.eemult_message then
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.eemult_message)
+              else
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'ee_mult', amount, percent)
+              end
+          end
+      end
+      return true
+    end
+
+    if (key == 'eee_mult' or key == 'eeemult' or key == 'EEEmult_mod') and amount ~= 1 then 
+      if effect.card then juice_card(effect.card) end
+      mult = mod_mult(mult:arrow(3, amount))
+      update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
+      if not effect.remove_default_message then
+          if from_edition then
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^^^"..amount.." Mult", colour =  G.C.EDITION, edition = true})
+          elseif key ~= 'EEEmult_mod' then
+              if effect.eeemult_message then
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.eeemult_message)
+              else
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'eee_mult', amount, percent)
+              end
+          end
+      end
+      return true
+    end
+
+    if (key == 'hyper_mult' or key == 'hypermult' or key == 'hypermult_mod') and type(amount) == 'table' then 
+      if effect.card then juice_card(effect.card) end
+      mult = mod_mult(mult:arrow(amount[1], amount[2]))
+      update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
+      if not effect.remove_default_message then
+          if from_edition then
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = ((amount[1] > 5 and ('{' .. amount[1] .. '}') or string.rep('^', amount[1])) .. amount[2]).." Mult", colour =  G.C.EDITION, edition = true})
+          elseif key ~= 'hypermult_mod' then
+              if effect.hypermult_message then
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.hypermult_message)
+              else
+                  card_eval_status_text(scored_card or effect.card or effect.focus, 'hyper_mult', amount, percent)
+              end
+          end
+      end
+      return true
+    end
+  end
+  for _, v in ipairs({'e_mult', 'e_chips', 'ee_mult', 'ee_chips', 'eee_mult', 'eee_chips', 'hyper_mult', 'hyper_chips',
+                      'emult', 'echips', 'eemult', 'eechips', 'eeemult', 'eeechips', 'hypermult', 'hyperchips',
+                      'Emult_mod', 'Echip_mod', 'EEmult_mod', 'EEchip_mod', 'EEEmult_mod', 'EEEchip_mod', 'hypermult_mod', 'hyperchip_mod'}) do
+    table.insert(SMODS.calculation_keys, v)
+  end
+  if not smods_xchips then
+    for _, v in ipairs({'x_chips', 'xchips', 'Xchip_mod'}) do
+    table.insert(SMODS.calculation_keys, v)
+  end
+  end
+
+  -- prvent juice animations
+  local smce = SMODS.calculate_effect
+  function SMODS.calculate_effect(effect, ...)
+    if Talisman.config_file.disable_anims then effect.juice_card = nil end
+    return smce(effect, ...)
+  end
 end
 
 --some debugging functions

@@ -481,7 +481,7 @@ function Big:parse(input)
                 if (intPartLen - 1 >= LONG_STRING_MIN_LENGTH) then
                     b[1] = math.log10(b[1]) + log10LongString(string.sub(a[i], 1, intPartLen - 1))
                     b[2] = 1;
-                elseif ((a[i] ~= nil) and (a[i] ~= "")) then
+                elseif ((a[i] ~= nil) and (a[i] ~= "") and (tonumber(a[i]) ~= nil)) then
                     b[1] = b[1] * tonumber(a[i]);
                 end
             else
@@ -613,6 +613,14 @@ function Big:add(other)
     local p=x:min(other);
     local q=x:max(other);
     local t = -1;
+    if (p.array[2] == 2) and not p:gt(R.E_MAX_SAFE_INTEGER) then
+        p.array[2] = 1
+        p.array[1] = 10 ^ p.array[1]
+    end
+    if (q.array[2] == 2) and not q:gt(R.E_MAX_SAFE_INTEGER) then
+        q.array[2] = 1
+        q.array[1] = 10 ^ q.array[1]
+    end
     if (q:gt(R.E_MAX_SAFE_INTEGER) or q:div(p):gt(R.MAX_SAFE_INTEGER)) then
         t = q;
     elseif (q.array[2] == nil) or (q.array[2] == 0) then
@@ -659,6 +667,14 @@ function Big:sub(other)
     local q = x:max(other);
     local n = other:gt(x);
     local t = -1;
+    if (p.array[2] == 2) and not p:gt(R.E_MAX_SAFE_INTEGER) then
+        p.array[2] = 1
+        p.array[1] = 10 ^ p.array[1]
+    end
+    if (q.array[2] == 2) and not q:gt(R.E_MAX_SAFE_INTEGER) then
+        q.array[2] = 1
+        q.array[1] = 10 ^ q.array[1]
+    end
     if (q:gt(R.E_MAX_SAFE_INTEGER) or q:div(p):gt(R.MAX_SAFE_INTEGER)) then
         t = q;
         if n then
@@ -702,7 +718,7 @@ function Big:div(other)
         return Big:create(R.NaN)
     end
     if (other:eq(R.ZERO)) then
-        Big:create(R.POSITIVE_INFINITY)
+        return Big:create(R.POSITIVE_INFINITY)
     end
     if (other:eq(R.ONE)) then
         return x:clone()
@@ -833,7 +849,9 @@ function Big:pow(other)
         return self:abs():pow(other):neg()
     end
     if (self:lt(R.ZERO)) then
-        return Big:create(R.NaN)
+        --return Big:create(R.NaN)
+        --Override this interaction to always make positive numbers
+        return self:abs():pow(other)
     end
     if (self:eq(R.ONE)) then
         return Big:create(R.ONE)
@@ -1313,7 +1331,12 @@ function OmegaMeta.__eq(b1, b2)
 end
 
 function OmegaMeta.__tostring(b)
-    return b:toString()
+    return number_format(b)
+end
+
+function OmegaMeta.__concat(a, b)
+    a = Big:create(a)
+    return tostring(a) .. tostring(b)
 end
 
 

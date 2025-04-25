@@ -242,13 +242,26 @@ function Big:compare(b)
         return -1
     end
 
-    if self.e > b.e then return 1 end
-    if self.e < b.e then return -1 end
+    if self.m == 0 and self.e == 0 and b:is_negative() then
+        return 1
+    end
+    if self.m == 0 and self.e == 0 and b:is_positive() then
+        return -1
+    end
+    if self:is_positive() and b.m == 0 and b.e == 0 then
+        return 1
+    end
+    if self:is_negative() and b.m == 0 and b.e == 0 then
+        return -1
+    end
 
-    if self:is_positive() and self.m > b.m then return 1 end
-    if self:is_positive() and self.m < b.m then return -1 end
-    if self:is_negative() and self.m > b.m then return -1 end
-    if self:is_negative() and self.m < b.m then return 1 end
+    if self.e > b.e and self:is_positive() then return 1 end
+    if self.e < b.e and self:is_positive() then return -1 end
+    if self.e > b.e and self:is_negative() then return -1 end
+    if self.e < b.e and self:is_negative() then return 1 end
+
+    if self.m > b.m then return 1 end
+    if self.m < b.m then return -1 end
 end
 
 function Big:gt(b)
@@ -312,7 +325,7 @@ function Big:to_number()
 end
 
 function BigMeta.__tostring(b)
-    return b:to_string()
+    return number_format(b)
 end
 
 function Big.parse(str)
@@ -326,6 +339,11 @@ function Big.parse(str)
         parts = {m, e}
     end
     return Big:new(tonumber(parts[1]), math.floor(tonumber(parts[2]))):normalized()
+end
+
+function BigMeta.__concat(a, b)
+    a = Big:create(a)
+    return tostring(a) .. tostring(b)
 end
 
 --Adding things OmegaNum has that this doesn't...
