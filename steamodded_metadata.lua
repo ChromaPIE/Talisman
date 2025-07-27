@@ -4,7 +4,7 @@
 --- MOD_AUTHOR: [MathIsFun_, Mathguy24, jenwalter666, cg-223]
 --- MOD_DESCRIPTION: A mod that increases Balatro's score limit and skips scoring animations.
 --- PREFIX: talisman
---- VERSION: 2.2.0b
+--- VERSION: 2.3.1
 
 ----------------------------------------------
 ------------MOD CODE -------------------------
@@ -57,6 +57,9 @@ if SMODS.current_mod then
   SMODS.current_mod.debug_info = {
     ["Break Infinity"] = Talisman.config_file.break_infinity
   }
+  SMODS.current_mod.description_loc_vars = function()
+    return { background_colour = G.C.CLEAR, text_colour = G.C.WHITE, scale = 1.2 }
+  end
 end
 --[[SMODS.Joker{
   key = "test",

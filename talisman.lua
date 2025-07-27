@@ -1,9 +1,15 @@
 local lovely = require("lovely")
 local nativefs = require("nativefs")
 
-if not nativefs.getInfo(lovely.mod_dir .. "/Talisman") then
+local info = nativefs.getDirectoryItemsInfo(lovely.mod_dir)
+local talisman_path = ""
+for i, v in pairs(info) do
+  if v.type == "directory" and nativefs.getInfo(lovely.mod_dir .. "/" .. v.name .. "/talisman.lua") then talisman_path = lovely.mod_dir .. "/" .. v.name end
+end
+
+if not nativefs.getInfo(talisman_path) then
     error(
-        'Could not find proper Talisman folder.\nPlease make sure the folder for Talisman is named exactly "Talisman" and not "Talisman-main" or anything else.')
+        'Could not find proper Talisman folder.\nPlease make sure that Talisman is installed correctly and the folders arent nested.')
 end
 
 -- "Borrowed" from Trance
@@ -21,8 +27,8 @@ end
 local talismanloc = init_localization
 function init_localization()
 	local abc = load_file_with_fallback2(
-		lovely.mod_dir .. "/Talisman/localization/" .. (G.SETTINGS.language or "en-us") .. ".lua",
-		lovely.mod_dir .. "/Talisman/localization/en-us.lua"
+		talisman_path .. "/localization/" .. (G.SETTINGS.language or "en-us") .. ".lua",
+		talisman_path .. "/localization/en-us.lua"
 	)
 	for k, v in pairs(abc) do
 		if k ~= "descriptions" then
@@ -34,9 +40,9 @@ function init_localization()
 	talismanloc()
 end
 
-Talisman = {config_file = {disable_anims = true, break_infinity = "omeganum", score_opt_id = 2}}
-if nativefs.read(lovely.mod_dir.."/Talisman/config.lua") then
-    Talisman.config_file = STR_UNPACK(nativefs.read(lovely.mod_dir.."/Talisman/config.lua"))
+Talisman = {config_file = {disable_anims = false, break_infinity = "omeganum", score_opt_id = 3}, mod_path = talisman_path}
+if nativefs.read(Talisman.mod_path.."/config.lua") then
+    Talisman.config_file = STR_UNPACK(nativefs.read(Talisman.mod_path.."/config.lua"))
 
     if Talisman.config_file.break_infinity and type(Talisman.config_file.break_infinity) ~= 'string' then
       Talisman.config_file.break_infinity = "omeganum"
@@ -113,9 +119,9 @@ G.FUNCS.talisman_upd_score_opt = function(e)
   nativefs.write(lovely.mod_dir .. "/Talisman/config.lua", STR_PACK(Talisman.config_file))
 end
 if Talisman.config_file.break_infinity then
-  Big, err = nativefs.load(lovely.mod_dir.."/Talisman/big-num/"..Talisman.config_file.break_infinity..".lua")
+  Big, err = nativefs.load(Talisman.mod_path.."/big-num/"..Talisman.config_file.break_infinity..".lua")
   if not err then Big = Big() else Big = nil end
-  Notations = nativefs.load(lovely.mod_dir.."/Talisman/big-num/notations.lua")()
+  Notations = nativefs.load(Talisman.mod_path.."/big-num/notations.lua")()
   -- We call this after init_game_object to leave room for mods that add more poker hands
   Talisman.igo = function(obj)
       for _, v in pairs(obj.hands) do
@@ -234,20 +240,20 @@ function lenient_bignum(x)
       if ante < 1 then return to_big(100) end
       if ante <= 8 then 
         local amount = amounts[ante]
-        if (amount:lt(R.E_MAX_SAFE_INTEGER)) then
-          local exponent = to_big(10)^(math.floor(amount:log10() - to_big(1))):to_number()
-          amount = math.floor(amount / exponent):to_number() * exponent
+        if to_big(amount) < to_big(R and R.E_MAX_SAFE_INTEGER or 9e15) then
+          local exponent = to_big(10)^to_number(math.floor(math.log(amount, 10) - to_big(1)))
+          amount = to_number(math.floor(amount / exponent)) * exponent
         end
-        amount:normalize()
+        if type(amount) == "table" then amount:normalize() end
         return amount
        end
       local a, b, c, d = amounts[8], amounts[8]/amounts[7], ante-8, 1 + 0.2*(ante-8)
       local amount = math.floor(a*(b + (b*k*c)^d)^c)
-      if (amount:lt(R.E_MAX_SAFE_INTEGER)) then
-        local exponent = to_big(10)^(math.floor(amount:log10() - to_big(1))):to_number()
-        amount = math.floor(amount / exponent):to_number() * exponent
+      if to_big(amount) < to_big(R and R.E_MAX_SAFE_INTEGER or 9e15) then
+        local exponent = to_big(10)^to_number(math.floor(math.log(amount, 10) - to_big(1)))
+        amount = to_number(math.floor(amount / exponent)) * exponent
       end
-      amount:normalize()
+      if type(amount) == "table" then amount:normalize() end
       return amount
     end
   end
@@ -266,11 +272,11 @@ function lenient_bignum(x)
         if ante <= 8 then return amounts[ante] end
         local a, b, c, d = amounts[8],1.6,ante-8, 1 + 0.2*(ante-8)
         local amount = a*(b+(k*c)^d)^c
-        if (amount:lt(R.E_MAX_SAFE_INTEGER)) then
-          local exponent = to_big(10)^(math.floor(amount:log10() - to_big(1))):to_number()
-          amount = math.floor(amount / exponent):to_number() * exponent
+        if to_big(amount) < to_big(R and R.E_MAX_SAFE_INTEGER or 9e15) then
+          local exponent = to_big(10)^to_number(math.floor(math.log(amount, 10) - to_big(1)))
+          amount = to_number(math.floor(amount / exponent)) * exponent
         end
-        amount:normalize()
+        if type(amount) == "table" then amount:normalize() end
         return amount
       elseif G.GAME.modifiers.scaling == 2 then 
         local amounts = {
@@ -281,11 +287,11 @@ function lenient_bignum(x)
         if ante <= 8 then return amounts[ante] end
         local a, b, c, d = amounts[8],1.6,ante-8, 1 + 0.2*(ante-8)
         local amount = a*(b+(k*c)^d)^c
-        if (amount:lt(R.E_MAX_SAFE_INTEGER)) then
-          local exponent = to_big(10)^(math.floor(amount:log10() - to_big(1))):to_number()
-          amount = math.floor(amount / exponent):to_number() * exponent
+        if to_big(amount) < to_big(R and R.E_MAX_SAFE_INTEGER or 9e15) then
+          local exponent = to_big(10)^to_number(math.floor(math.log(amount, 10) - to_big(1)))
+          amount = to_number(math.floor(amount / exponent)) * exponent
         end
-        amount:normalize()
+        if type(amount) == "table" then amount:normalize() end
         return amount
       elseif G.GAME.modifiers.scaling == 3 then 
         local amounts = {
@@ -296,11 +302,11 @@ function lenient_bignum(x)
         if ante <= 8 then return amounts[ante] end
         local a, b, c, d = amounts[8],1.6,ante-8, 1 + 0.2*(ante-8)
         local amount = a*(b+(k*c)^d)^c
-        if (amount:lt(R.E_MAX_SAFE_INTEGER)) then
-          local exponent = to_big(10)^(math.floor(amount:log10() - to_big(1))):to_number()
-          amount = math.floor(amount / exponent):to_number() * exponent
+        if to_big(amount) < to_big(R and R.E_MAX_SAFE_INTEGER or 9e15) then
+          local exponent = to_big(10)^to_number(math.floor(math.log(amount, 10) - to_big(1)))
+          amount = to_number(math.floor(amount / exponent)) * exponent
         end
-        amount:normalize()
+        if type(amount) == "table" then amount:normalize() end
         return amount
       end
     end
@@ -742,8 +748,8 @@ end
 function Card:get_chip_x_bonus()
     if self.debuff then return 0 end
     if self.ability.set == 'Joker' then return 0 end
-    if (self.ability.x_chips or 0) <= 1 then return 0 end
-    return self.ability.x_chips
+    if (SMODS.multiplicative_stacking(self.ability.x_chips or 1, self.ability.perma_x_chips or 0) or 0) <= 1 then return 0 end
+    return SMODS.multiplicative_stacking(self.ability.x_chips or 1, self.ability.perma_x_chips or 0)
 end
 
 function Card:get_chip_e_bonus()
@@ -983,7 +989,7 @@ if SMODS and SMODS.calculate_individual_effect then
       update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
       if not effect.remove_default_message then
           if from_edition then
-              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^"..amount.." Mult", colour =  G.C.EDITION, edition = true})
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^"..amount.." "..localize("k_mult"), colour =  G.C.EDITION, edition = true})
           elseif key ~= 'Emult_mod' then
               if effect.emult_message then
                   card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.emult_message)
@@ -1001,7 +1007,7 @@ if SMODS and SMODS.calculate_individual_effect then
       update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
       if not effect.remove_default_message then
           if from_edition then
-              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^^"..amount.." Mult", colour =  G.C.EDITION, edition = true})
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^^"..amount.." "..localize("k_mult"), colour =  G.C.EDITION, edition = true})
           elseif key ~= 'EEmult_mod' then
               if effect.eemult_message then
                   card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.eemult_message)
@@ -1019,7 +1025,7 @@ if SMODS and SMODS.calculate_individual_effect then
       update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
       if not effect.remove_default_message then
           if from_edition then
-              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^^^"..amount.." Mult", colour =  G.C.EDITION, edition = true})
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = "^^^"..amount.." "..localize("k_mult"), colour =  G.C.EDITION, edition = true})
           elseif key ~= 'EEEmult_mod' then
               if effect.eeemult_message then
                   card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.eeemult_message)
@@ -1037,7 +1043,7 @@ if SMODS and SMODS.calculate_individual_effect then
       update_hand_text({delay = 0}, {chips = hand_chips, mult = mult})
       if not effect.remove_default_message then
           if from_edition then
-              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = ((amount[1] > 5 and ('{' .. amount[1] .. '}') or string.rep('^', amount[1])) .. amount[2]).." Mult", colour =  G.C.EDITION, edition = true})
+              card_eval_status_text(scored_card, 'jokers', nil, percent, nil, {message = ((amount[1] > 5 and ('{' .. amount[1] .. '}') or string.rep('^', amount[1])) .. amount[2]).." "..localize("k_mult"), colour =  G.C.EDITION, edition = true})
           elseif key ~= 'hypermult_mod' then
               if effect.hypermult_message then
                   card_eval_status_text(scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.hypermult_message)
